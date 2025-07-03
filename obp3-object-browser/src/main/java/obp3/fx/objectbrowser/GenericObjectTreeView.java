@@ -12,9 +12,11 @@ import javafx.scene.text.TextFlow;
 import obp3.fx.objectbrowser.api.ObjectView;
 import obp3.fx.objectbrowser.api.ObjectViewFor;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @ObjectViewFor(Object.class)
@@ -60,15 +62,23 @@ public class GenericObjectTreeView implements ObjectView {
         }
 
         // Add dummy child to allow expansion
-        if (obj.getClass().getDeclaredFields().length > 0) {
+        if (type.isArray() || obj.getClass().getDeclaredFields().length > 0) {
             node.getChildren().add(new TreeItem<>(new ObjectField("Loading...", Object.class, null)));
         }
+
+
 
         node.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> {
             if (isNowExpanded && node.getChildren().size() == 1 &&
                     "Loading...".equals(node.getChildren().getFirst().getValue().name)) {
 
                 node.getChildren().clear(); // remove dummy
+
+                if (type.isArray()) {
+                    pagedArray(node, obj, Array.getLength(obj), 0, 5);
+                    return;
+                }
+
                 for (Field field : obj.getClass().getDeclaredFields()) {
                     field.setAccessible(true);
                     try {
@@ -83,6 +93,26 @@ public class GenericObjectTreeView implements ObjectView {
         });
 
         return node;
+    }
+
+    void pagedArray(TreeItem<ObjectField> container, Object array, int length, int start, int pageSize) {
+        int end = Math.min(start + pageSize, length);
+        for (int i = start; i < end; i++) {
+            container.getChildren().add(buildLazyTree(Objects.toString(i), Array.get(array, i)));
+
+        }
+        if (end < length) {
+            var nextLoader = new TreeItem<>(new ObjectField("...", Object.class, null));
+            nextLoader.getChildren().add(new TreeItem<>(new ObjectField("Loading...", Object.class, null)));
+            nextLoader.setExpanded(false);
+            container.getChildren().add(nextLoader);
+            nextLoader.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> {
+                if (isNowExpanded) {
+                    container.getChildren().remove(nextLoader);
+                    pagedArray(container, array, length, end, pageSize);
+                }
+            });
+        }
     }
 
     static class ObjectField {
@@ -103,8 +133,29 @@ public class GenericObjectTreeView implements ObjectView {
 
         private String format(Object obj) {
             if (obj == null) return "null";
-            String s = obj.toString();
+            String s = obj.getClass().isArray() ? arrayToString(obj) : Objects.toString(obj);
             return s.length() > 50 ? s.substring(0, 47) + "..." : s;
+        }
+
+        String arrayToString(Object array) {
+            if (array == null) return "null";
+            if (!array.getClass().isArray()) return array.toString();
+
+            Class<?> compType = array.getClass().getComponentType();
+
+            if (compType.isPrimitive()) {
+                if (compType == int.class) return Arrays.toString((int[]) array);
+                if (compType == long.class) return Arrays.toString((long[]) array);
+                if (compType == double.class) return Arrays.toString((double[]) array);
+                if (compType == float.class) return Arrays.toString((float[]) array);
+                if (compType == boolean.class) return Arrays.toString((boolean[]) array);
+                if (compType == char.class) return Arrays.toString((char[]) array);
+                if (compType == byte.class) return Arrays.toString((byte[]) array);
+                if (compType == short.class) return Arrays.toString((short[]) array);
+            }
+
+            // Object array
+            return Arrays.toString((Object[]) array);
         }
     }
     static class StyledTreeCell extends TreeCell<ObjectField> {
@@ -116,10 +167,14 @@ public class GenericObjectTreeView implements ObjectView {
                 setText(null);
                 setGraphic(null);
             } else {
-                Text name = new Text(item.name + ": ");
+                Text name = new Text(item.name);
                 name.setFont(Font.font("Menlo", FontPosture.REGULAR, 12));
                 name.setFill(Color.DARKSLATEGRAY);
-                Text type = new Text(item.type.getSimpleName());
+                if (item.name.equals("...")) {
+                    setGraphic(new TextFlow(name));
+                    return;
+                }
+                Text type = new Text(": " + item.type.getSimpleName());
                 type.setFont(Font.font("Menlo", FontPosture.ITALIC, 12));
                 type.setFill(Color.SLATEGRAY);
                 Text value = new Text(" = " + item.format(item.value));

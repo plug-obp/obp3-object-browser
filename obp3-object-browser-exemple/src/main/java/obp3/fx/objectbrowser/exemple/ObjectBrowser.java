@@ -19,8 +19,11 @@ public class ObjectBrowser extends Application {
         primaryStage.setScene(scene);
         primaryStage.setTitle("Object Browser");
 
-        Object sample = new Person("Alice", 30);
-//        ObjectViewFactory.register(Person.class, PersonView.class);
+        Object sample = new Person("Alice", 30, new boolean[] {
+                true, false, true, false, true,
+                true, true, false, true, true,
+                false, true, false, true, true,
+                true, false, true});
         ObjectView view = ObjectViewFactory.instance.createView(sample);
         root.setCenter(new ObjectViewContainer( sample ).getView());
         root.setBottom(new ObjectViewContainer( new Point(2, 3)).getView());
