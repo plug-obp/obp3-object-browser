@@ -1,0 +1,133 @@
+package obp3.fx.objectbrowser;
+
+import javafx.scene.Node;
+import javafx.scene.control.TreeCell;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+import obp3.fx.objectbrowser.api.ObjectView;
+import obp3.fx.objectbrowser.api.ObjectViewFor;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+@ObjectViewFor(Object.class)
+public class GenericObjectTreeView implements ObjectView {
+    private TreeView<ObjectField> treeView = new TreeView<>();
+
+    public GenericObjectTreeView() {
+        treeView.setCellFactory(tv -> new StyledTreeCell());
+    }
+    @Override
+    public String getName() {
+        return "Generic Tree View";
+    }
+
+    @Override
+    public Node getView() {
+        return treeView;
+    }
+
+    @Override
+    public void setObject(Object object) {
+        treeView.setRoot(buildLazyTree("root", object));
+    }
+
+    private static final Set<Class<?>> PRIMITIVE_TYPES = new HashSet<>(Arrays.asList(
+            String.class,
+            Boolean.class, Byte.class, Short.class, Integer.class, Long.class,
+            Float.class, Double.class,
+            Character.class
+    ));
+
+    private boolean isPrimitiveOrWrapper(Class<?> clazz) {
+        return clazz.isPrimitive() || PRIMITIVE_TYPES.contains(clazz);
+    }
+
+
+    private TreeItem<ObjectField> buildLazyTree(String name, Object obj) {
+        Class<?> type = obj != null ? obj.getClass() : Object.class;
+        TreeItem<ObjectField> node = new TreeItem<>(new ObjectField(name, type, obj));
+
+        if (obj == null || isPrimitiveOrWrapper(obj.getClass())) {
+            return node; // no children
+        }
+
+        // Add dummy child to allow expansion
+        if (obj.getClass().getDeclaredFields().length > 0) {
+            node.getChildren().add(new TreeItem<>(new ObjectField("Loading...", Object.class, null)));
+        }
+
+        node.expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -> {
+            if (isNowExpanded && node.getChildren().size() == 1 &&
+                    "Loading...".equals(node.getChildren().getFirst().getValue().name)) {
+
+                node.getChildren().clear(); // remove dummy
+                for (Field field : obj.getClass().getDeclaredFields()) {
+                    field.setAccessible(true);
+                    try {
+                        Object value = field.get(obj);
+                        var child = buildLazyTree(field.getName(), value);
+                        node.getChildren().add(child);
+                    } catch (IllegalAccessException e) {
+                        node.getChildren().add(new TreeItem<>(new ObjectField(field.getName(), Object.class, "<access denied>")));
+                    }
+                }
+            }
+        });
+
+        return node;
+    }
+
+    static class ObjectField {
+        String name;
+        Class<?> type;
+        Object value;
+
+        public ObjectField(String name, Class<?> type, Object value) {
+            this.name = name;
+            this.type = type;
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return name + ": " + type.getSimpleName() + " = " + format(value);
+        }
+
+        private String format(Object obj) {
+            if (obj == null) return "null";
+            String s = obj.toString();
+            return s.length() > 50 ? s.substring(0, 47) + "..." : s;
+        }
+    }
+    static class StyledTreeCell extends TreeCell<ObjectField> {
+        @Override
+        protected void updateItem(ObjectField item, boolean empty) {
+            super.updateItem(item, empty);
+
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
+            } else {
+                Text name = new Text(item.name + ": ");
+                name.setFont(Font.font("Menlo", FontPosture.REGULAR, 12));
+                name.setFill(Color.DARKSLATEGRAY);
+                Text type = new Text(item.type.getSimpleName());
+                type.setFont(Font.font("Menlo", FontPosture.ITALIC, 12));
+                type.setFill(Color.SLATEGRAY);
+                Text value = new Text(" = " + item.format(item.value));
+                value.setFont(Font.font("Menlo", FontPosture.REGULAR, 12));
+
+                TextFlow flow = new TextFlow(name, type, value);
+                setGraphic(flow);
+            }
+        }
+    }
+}

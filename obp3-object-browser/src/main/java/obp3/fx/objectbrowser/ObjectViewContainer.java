@@ -42,7 +42,7 @@ public class ObjectViewContainer {
         // Set the initial view (first view in the list)
         if (viewSelector.getItems().isEmpty()) return;
 
-        String firstViewName = viewSelector.getItems().get(0);
+        String firstViewName = viewSelector.getItems().getFirst();
         updateView(firstViewName);
     }
 

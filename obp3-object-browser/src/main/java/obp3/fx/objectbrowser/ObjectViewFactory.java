@@ -56,7 +56,7 @@ public class ObjectViewFactory {
 
         List<Class<? extends ObjectView>> viewClasses = viewMap.getOrDefault(cls, Collections.emptyList());
 
-        return Stream.concat(viewClasses.stream(), Stream.of(GenericObjectView.class))
+        return Stream.concat(Stream.concat(viewClasses.stream(), Stream.of(GenericObjectTreeView.class)), Stream.of(GenericObjectView.class))
                 .collect(Collectors.toList());
     }
 }
