@@ -1,10 +1,10 @@
 import obp3.fx.objectbrowser.exemple.person.PersonSummaryView;
 import obp3.fx.objectbrowser.exemple.person.PersonView;
 
-module obp3.fx.objectbrowser.exemple {
+module obp.fx.objectbrowser.exemple {
     requires javafx.controls;
-    requires obp3.fx.objectbrowser.api;
-    requires obp3.fx.objectbrowser;
+    requires obp.fx.objectbrowser.api;
+    requires obp.fx.objectbrowser;
     provides obp3.fx.objectbrowser.api.ObjectView with
             PersonView,
             PersonSummaryView;
