@@ -14,10 +14,9 @@ import obp3.fx.objectbrowser.api.ObjectViewFor;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.lang.reflect.InaccessibleObjectException;
+import java.lang.reflect.Modifier;
+import java.util.*;
 
 @ObjectViewFor(Object.class)
 public class GenericObjectTreeView implements ObjectView {
@@ -78,15 +77,22 @@ public class GenericObjectTreeView implements ObjectView {
                     pagedArray(node, obj, Array.getLength(obj), 0, 5);
                     return;
                 }
-
-                for (Field field : obj.getClass().getDeclaredFields()) {
-                    field.setAccessible(true);
+//                System.out.println("----------- declared fields");
+//                System.out.println(Arrays.toString(obj.getClass().getDeclaredFields()));
+//                System.out.println("----------- all fields");
+//                System.out.println(Arrays.toString(obj.getClass().getFields()));
+                for (Field field : getAllFields(obj.getClass())) {
+                    if (Modifier.isStatic(field.getModifiers())) {continue;}
                     try {
+                        field.setAccessible(true);
                         Object value = field.get(obj);
                         var child = buildLazyTree(field.getName(), value);
                         node.getChildren().add(child);
-                    } catch (IllegalAccessException e) {
-                        node.getChildren().add(new TreeItem<>(new ObjectField(field.getName(), Object.class, "<access denied>")));
+                    } catch (IllegalAccessException | InaccessibleObjectException e) {
+                        var ti = new TreeItem<>(
+                                new ObjectField(field.getName(), Object.class, e.toString()));
+                        node.getChildren().add(ti);
+                        System.out.println(e.toString());
                     }
                 }
             }
@@ -95,7 +101,20 @@ public class GenericObjectTreeView implements ObjectView {
         return node;
     }
 
+    private List<Field> getAllFields(Class<?> type) {
+        List<Field> result = new ArrayList<Field>();
+
+        Class<?> i = type;
+        while (i != null && i != Object.class) {
+            Collections.addAll(result, i.getDeclaredFields());
+            i = i.getSuperclass();
+        }
+
+        return result;
+    }
+
     void pagedArray(TreeItem<ObjectField> container, Object array, int length, int start, int pageSize) {
+        if (length == 0) return;
         int end = Math.min(start + pageSize, length);
         for (int i = start; i < end; i++) {
             container.getChildren().add(buildLazyTree(Objects.toString(i), Array.get(array, i)));
