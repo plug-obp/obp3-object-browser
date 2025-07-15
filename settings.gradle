@@ -1,5 +1,5 @@
 rootProject.name = 'obp3-object-browser'
 include 'obp3-object-browser-api'
-include 'obp3-object-browser'
+include 'obp3-object-browser-base'
 include 'obp3-object-browser-exemple'
 
